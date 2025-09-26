@@ -2,6 +2,106 @@ import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 
+// Função para aguardar download começar e terminar
+async function waitForDownload(downloadPath, page, timeout = 600000) { // 10 minutos timeout
+    return new Promise((resolve) => {
+        console.log(' ○'.blue + ' Aguardando download começar...'.white);
+        
+        // Lista inicial de arquivos
+        const initialFiles = fs.existsSync(downloadPath) ? fs.readdirSync(downloadPath) : [];
+        console.log(' ○'.blue + ` Arquivos iniciais na pasta: ${initialFiles.length}`.white);
+        
+        let checkCount = 0;
+        const maxChecks = timeout / 3000; // Verificar a cada 3 segundos
+        let downloadStarted = false;
+        let lastFileSize = 0;
+        let stableCount = 0;
+        
+        const checkInterval = setInterval(() => {
+            checkCount++;
+            
+            try {
+                // Verificar se a página ainda está ativa
+                if (page && page.isClosed()) {
+                    console.log(' ○'.red + ' Página foi fechada durante o monitoramento'.white);
+                    clearInterval(checkInterval);
+                    resolve({ success: false, fileName: null, reason: 'page_closed' });
+                    return;
+                }
+                
+                if (!fs.existsSync(downloadPath)) {
+                    console.log(' ○'.yellow + ` Verificação ${checkCount}: Pasta de download não existe ainda`.white);
+                    return;
+                }
+                
+                const currentFiles = fs.readdirSync(downloadPath);
+                const newFiles = currentFiles.filter(file => !initialFiles.includes(file));
+                
+                if (newFiles.length > 0 && !downloadStarted) {
+                    console.log(' ○'.green + ` Download iniciado! Arquivo detectado: ${newFiles.join(', ')}`.white);
+                    downloadStarted = true;
+                }
+                
+                if (downloadStarted && newFiles.length > 0) {
+                    // Verificar se o download terminou
+                    for (const fileName of newFiles) {
+                        const filePath = path.join(downloadPath, fileName);
+                        
+                        try {
+                            const stats = fs.statSync(filePath);
+                            const currentSize = stats.size;
+                            
+                            if (currentSize > 0) {
+                                if (currentSize === lastFileSize) {
+                                    stableCount++;
+                                    console.log(' ○'.blue + ` Arquivo estável há ${stableCount} verificações (${(currentSize / 1024 / 1024).toFixed(2)} MB)`.white);
+                                    
+                                    // Se o arquivo está estável por 3 verificações (9 segundos), consideramos completo
+                                    if (stableCount >= 3) {
+                                        console.log(' ○'.green + ` Download concluído: ${fileName} (${(currentSize / 1024 / 1024).toFixed(2)} MB)`.white);
+                                        
+                                        const fileInfo = {
+                                            fileName: fileName,
+                                            filePath: filePath,
+                                            fileSize: currentSize,
+                                            fileSizeMB: (currentSize / 1024 / 1024).toFixed(2),
+                                            downloadDate: new Date(stats.birthtime).toISOString(),
+                                            fileExtension: path.extname(fileName)
+                                        };
+                                        
+                                        clearInterval(checkInterval);
+                                        resolve({ success: true, ...fileInfo });
+                                        return;
+                                    }
+                                } else {
+                                    stableCount = 0;
+                                    lastFileSize = currentSize;
+                                    console.log(' ○'.blue + ` Download em progresso: ${(currentSize / 1024 / 1024).toFixed(2)} MB`.white);
+                                }
+                            }
+                            
+                        } catch (error) {
+                            console.log(' ○'.yellow + ` Erro ao verificar arquivo ${fileName}: ${error.message}`.white);
+                        }
+                    }
+                } else if (!downloadStarted) {
+                    console.log(' ○'.blue + ` Verificação ${checkCount}/${maxChecks}: Aguardando download começar...`.white);
+                }
+                
+                // Timeout
+                if (checkCount >= maxChecks) {
+                    console.log(' ○'.red + ' Timeout: Download não foi concluído no tempo esperado'.white);
+                    clearInterval(checkInterval);
+                    resolve({ success: false, fileName: null });
+                }
+                
+            } catch (error) {
+                console.log(' ○'.red + ` Erro durante verificação ${checkCount}: ${error.message}`.white);
+            }
+        }, 3000); // Verificar a cada 3 segundos
+    });
+}
+
 async function openPage(browser, userData) {
     let page;
     try {
@@ -123,9 +223,10 @@ async function openPage(browser, userData) {
             setTimeout(() => {
                 resolve(false)
             }, 60000)
-            setInterval(async () => {
+            const interval = setInterval(async () => {
                 const elements = await page.$$('mat-option');
                 if (elements.length > 0) {
+                    clearInterval(interval);
                     resolve(elements)
                 }
             }, 1000)
@@ -210,9 +311,6 @@ async function openPage(browser, userData) {
         }
 
         console.log(' ○'.green + ' Visualização de vídeo iniciada...'.white);
-        await new Promise(resolve => setTimeout(resolve, 211000));
-
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });
 
         // Aguardar botões de download aparecerem
         await page.waitForSelector('.action-button.bg-white.relative.mdc-button.mdc-button--outlined.mat-mdc-outlined-button.mat-primary.mat-mdc-button-base.ng-star-inserted', { timeout: 120000 });
@@ -246,13 +344,35 @@ async function openPage(browser, userData) {
         console.log(' ○'.green + ' Download de vídeo iniciado...'.white);
         console.log(' ○'.green + ` Arquivo será salvo em: ${process.cwd()}/downloads`.white);
 
-        await new Promise(resolve => setTimeout(resolve, 211000));
+        // Aguardar download começar e terminar
+        const downloadResult = await waitForDownload(downloadPath, page);
+        
+        if (downloadResult.success) {
+            console.log(' ○'.green + ` Download concluído: ${downloadResult.fileName}`.white);
+            console.log(' ○'.green + ` Tamanho: ${downloadResult.fileSizeMB} MB`.white);
+        } else {
+            console.log(' ○'.red + ' Timeout: Download não foi concluído no tempo esperado'.white);
+        }
 
-        return true;
+        // Aguardar um pouco mais para garantir que todas as operações terminaram
+        console.log(' ○'.blue + ' Aguardando operações finalizarem...'.white);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        return downloadResult;
     } catch (error) {
         throw new Error('Erro ao abrir link: ' + error.message);
     } finally {
-        await page?.close();
+        // Verificar se a página ainda existe antes de tentar fechar
+        if (page && !page.isClosed()) {
+            try {
+                await page.close();
+                console.log(' ○'.blue + ' Página fechada com sucesso'.white);
+            } catch (closeError) {
+                console.log(' ○'.yellow + ` Aviso: Erro ao fechar página: ${closeError.message}`.white);
+            }
+        } else {
+            console.log(' ○'.blue + ' Página já estava fechada'.white);
+        }
     }
 }
 
