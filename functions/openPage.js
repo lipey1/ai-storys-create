@@ -2,106 +2,6 @@ import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 
-// Função para aguardar download começar e terminar
-async function waitForDownload(downloadPath, page, timeout = 600000) { // 10 minutos timeout
-    return new Promise((resolve) => {
-        console.log(' ○'.blue + ' Aguardando download começar...'.white);
-        
-        // Lista inicial de arquivos
-        const initialFiles = fs.existsSync(downloadPath) ? fs.readdirSync(downloadPath) : [];
-        console.log(' ○'.blue + ` Arquivos iniciais na pasta: ${initialFiles.length}`.white);
-        
-        let checkCount = 0;
-        const maxChecks = timeout / 3000; // Verificar a cada 3 segundos
-        let downloadStarted = false;
-        let lastFileSize = 0;
-        let stableCount = 0;
-        
-        const checkInterval = setInterval(() => {
-            checkCount++;
-            
-            try {
-                // Verificar se a página ainda está ativa
-                if (page && page.isClosed()) {
-                    console.log(' ○'.red + ' Página foi fechada durante o monitoramento'.white);
-                    clearInterval(checkInterval);
-                    resolve({ success: false, fileName: null, reason: 'page_closed' });
-                    return;
-                }
-                
-                if (!fs.existsSync(downloadPath)) {
-                    console.log(' ○'.yellow + ` Verificação ${checkCount}: Pasta de download não existe ainda`.white);
-                    return;
-                }
-                
-                const currentFiles = fs.readdirSync(downloadPath);
-                const newFiles = currentFiles.filter(file => !initialFiles.includes(file));
-                
-                if (newFiles.length > 0 && !downloadStarted) {
-                    console.log(' ○'.green + ` Download iniciado! Arquivo detectado: ${newFiles.join(', ')}`.white);
-                    downloadStarted = true;
-                }
-                
-                if (downloadStarted && newFiles.length > 0) {
-                    // Verificar se o download terminou
-                    for (const fileName of newFiles) {
-                        const filePath = path.join(downloadPath, fileName);
-                        
-                        try {
-                            const stats = fs.statSync(filePath);
-                            const currentSize = stats.size;
-                            
-                            if (currentSize > 0) {
-                                if (currentSize === lastFileSize) {
-                                    stableCount++;
-                                    console.log(' ○'.blue + ` Arquivo estável há ${stableCount} verificações (${(currentSize / 1024 / 1024).toFixed(2)} MB)`.white);
-                                    
-                                    // Se o arquivo está estável por 3 verificações (9 segundos), consideramos completo
-                                    if (stableCount >= 3) {
-                                        console.log(' ○'.green + ` Download concluído: ${fileName} (${(currentSize / 1024 / 1024).toFixed(2)} MB)`.white);
-                                        
-                                        const fileInfo = {
-                                            fileName: fileName,
-                                            filePath: filePath,
-                                            fileSize: currentSize,
-                                            fileSizeMB: (currentSize / 1024 / 1024).toFixed(2),
-                                            downloadDate: new Date(stats.birthtime).toISOString(),
-                                            fileExtension: path.extname(fileName)
-                                        };
-                                        
-                                        clearInterval(checkInterval);
-                                        resolve({ success: true, ...fileInfo });
-                                        return;
-                                    }
-                                } else {
-                                    stableCount = 0;
-                                    lastFileSize = currentSize;
-                                    console.log(' ○'.blue + ` Download em progresso: ${(currentSize / 1024 / 1024).toFixed(2)} MB`.white);
-                                }
-                            }
-                            
-                        } catch (error) {
-                            console.log(' ○'.yellow + ` Erro ao verificar arquivo ${fileName}: ${error.message}`.white);
-                        }
-                    }
-                } else if (!downloadStarted) {
-                    console.log(' ○'.blue + ` Verificação ${checkCount}/${maxChecks}: Aguardando download começar...`.white);
-                }
-                
-                // Timeout
-                if (checkCount >= maxChecks) {
-                    console.log(' ○'.red + ' Timeout: Download não foi concluído no tempo esperado'.white);
-                    clearInterval(checkInterval);
-                    resolve({ success: false, fileName: null });
-                }
-                
-            } catch (error) {
-                console.log(' ○'.red + ` Erro durante verificação ${checkCount}: ${error.message}`.white);
-            }
-        }, 3000); // Verificar a cada 3 segundos
-    });
-}
-
 async function openPage(browser, userData) {
     let page;
     try {
@@ -224,11 +124,13 @@ async function openPage(browser, userData) {
                 resolve(false)
             }, 60000)
             const interval = setInterval(async () => {
-                const elements = await page.$$('mat-option');
-                if (elements.length > 0) {
-                    clearInterval(interval);
-                    resolve(elements)
-                }
+                try {
+                    const elements = await page.$$('mat-option');
+                    if (elements.length > 0) {
+                        clearInterval(interval);
+                        resolve(elements)
+                    }
+                } catch { }
             }, 1000)
         });
 
@@ -276,7 +178,7 @@ async function openPage(browser, userData) {
         console.log(' ○'.green + ' Geração de script confirmada...'.white);
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });
 
-        const createFullVideo = await page.waitForSelector('.mat-mdc-tooltip-trigger.w-44.flex-none.relative.font-normal.mdc-button.mdc-button--unelevated.mat-mdc-unelevated-button.mat-primary.mat-mdc-button-base.ng-star-inserted', { timeout: 60000 });
+        const createFullVideo = await page.waitForSelector('.mat-mdc-tooltip-trigger.w-44.flex-none.relative.font-normal.mdc-button.mdc-button--unelevated.mat-mdc-unelevated-button.mat-primary.mat-mdc-button-base.ng-star-inserted', { timeout: 180000 });
         await createFullVideo.click();
         const confirmButtonCreateFullVideo = await page.waitForSelector('#CONFIRM_ACTION_BUTTON', { timeout: 30000 });
         await confirmButtonCreateFullVideo.click();
@@ -286,25 +188,25 @@ async function openPage(browser, userData) {
         await page.waitForSelector('[mat-ripple-loader-class-name="mat-mdc-button-ripple"]', { timeout: 1800000 });
         const viewVideo = await page.evaluate(() => {
             return new Promise((resolve) => {
-              const interval = setInterval(() => {
-                const spans = document.querySelectorAll('[mat-ripple-loader-class-name="mat-mdc-button-ripple"] > span');
-                for (const span of spans) {
-                  if (span?.textContent?.trim().toLowerCase().includes('view')) {
-                    span.click();
-                    clearTimeout(timeout);  // não precisa mais do timeout
-                    clearInterval(interval); // para o loop
-                    resolve(true);
-                    break;
-                  }
-                }
-              }, 1000);
-              const timeout = setTimeout(() => {
-                clearInterval(interval); // limpa intervalo se deu timeout
-                resolve(false);
-              }, 1800000); // 30 minutos
+                const interval = setInterval(() => {
+                    const spans = document.querySelectorAll('[mat-ripple-loader-class-name="mat-mdc-button-ripple"] > span');
+                    for (const span of spans) {
+                        if (span?.textContent?.trim().toLowerCase().includes('view')) {
+                            span.click();
+                            clearTimeout(timeout);  // não precisa mais do timeout
+                            clearInterval(interval); // para o loop
+                            resolve(true);
+                            break;
+                        }
+                    }
+                }, 1000);
+                const timeout = setTimeout(() => {
+                    clearInterval(interval); // limpa intervalo se deu timeout
+                    resolve(false);
+                }, 1800000); // 30 minutos
             });
-          });
-          
+        });
+
 
         if (!viewVideo) {
             throw new Error('Falha ao visualizar vídeo');
@@ -312,47 +214,83 @@ async function openPage(browser, userData) {
 
         console.log(' ○'.green + ' Visualização de vídeo iniciada...'.white);
 
-        // Aguardar botões de download aparecerem
-        await page.waitForSelector('.action-button.bg-white.relative.mdc-button.mdc-button--outlined.mat-mdc-outlined-button.mat-primary.mat-mdc-button-base.ng-star-inserted', { timeout: 120000 });
+        // Aguardar tags <video> aparecerem
+        await page.waitForSelector('video', { timeout: 120000 });
 
-        // Encontrar e clicar no botão de download
-        const downloadSuccess = await page.evaluate(() => {
-            return new Promise((resolve) => {
-                const interval = setInterval(() => {
-                        const spans = document.querySelectorAll('.action-button.bg-white.relative.mdc-button.mdc-button--outlined.mat-mdc-outlined-button.mat-primary.mat-mdc-button-base.ng-star-inserted > span');
-                    for (const span of spans) {
-                        console.log(span, span?.textContent?.trim().toLowerCase())
-                        if (span && span.textContent?.trim().toLowerCase().includes('download')) {
-                            span.click();
-                            clearInterval(interval);
-                            resolve(true);
-                            return;
-                        }
+        console.log(' ○'.green + ' Procurando tags <video> na página...'.white);
+
+        // Extrai URLs dos vídeos
+        const videoUrls = await page.evaluate(() => {
+            const videos = document.querySelectorAll('video');
+            const urls = [];
+
+            videos.forEach((video, index) => {
+                // Tenta diferentes fontes de vídeo
+                if (video.src) {
+                    urls.push({
+                        index: index,
+                        src: video.src,
+                        type: 'src'
+                    });
+                }
+
+                // Verifica sources dentro do video
+                const sources = video.querySelectorAll('source');
+                sources.forEach((source, sourceIndex) => {
+                    if (source.src) {
+                        urls.push({
+                            index: index,
+                            sourceIndex: sourceIndex,
+                            src: source.src,
+                            type: 'source'
+                        });
                     }
-                }, 1000);
-                setTimeout(() => {
-                    clearInterval(interval);
-                    resolve(false);
-                }, 120000);
+                });
             });
+
+            return urls;
         });
 
-        if (!downloadSuccess) {
-            throw new Error('Falha ao baixar vídeo');
+        console.log(' ○'.yellow + ` Encontrados ${videoUrls.length} vídeos:`.white);
+        videoUrls.forEach((video, i) => {
+            console.log(' ○'.cyan + `  ${i + 1}. ${video.type} - ${video.src}`.white);
+        });
+
+        if (videoUrls.length === 0) {
+            throw new Error('Nenhum vídeo encontrado na página');
         }
 
-        console.log(' ○'.green + ' Download de vídeo iniciado...'.white);
-        console.log(' ○'.green + ` Arquivo será salvo em: ${process.cwd()}/downloads`.white);
+        // Baixa o primeiro vídeo encontrado
+        const firstVideo = videoUrls[0];
+        console.log(' ○'.green + ` Baixando vídeo: ${firstVideo.src}`.white);
 
-        // Aguardar download começar e terminar
-        const downloadResult = await waitForDownload(downloadPath, page);
-        
-        if (downloadResult.success) {
-            console.log(' ○'.green + ` Download concluído: ${downloadResult.fileName}`.white);
-            console.log(' ○'.green + ` Tamanho: ${downloadResult.fileSizeMB} MB`.white);
-        } else {
-            console.log(' ○'.red + ' Timeout: Download não foi concluído no tempo esperado'.white);
-        }
+        // Nome do arquivo baseado na URL
+        const urlParts = firstVideo.src.split('/');
+        const fileName = urlParts[urlParts.length - 1] || `video_${Date.now()}.mp4`;
+        const filePath = path.join(downloadPath, fileName);
+
+        console.log(' ○'.yellow + ` Salvando em: ${filePath}`.white);
+
+        // Baixa o vídeo usando fetch
+        const response = await fetch(firstVideo.src);
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        fs.writeFileSync(filePath, buffer);
+
+        console.log(' ○'.green + ' Vídeo baixado com sucesso!'.white);
+        console.log(' ○'.cyan + ` Arquivo salvo: ${filePath}`.white);
+        console.log(' ○'.cyan + ` Tamanho: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`.white);
+
+        // Cria resultado no formato esperado
+        const downloadResult = {
+            success: true,
+            fileName: fileName,
+            filePath: filePath,
+            fileSize: buffer.length,
+            fileSizeMB: (buffer.length / 1024 / 1024).toFixed(2),
+            downloadDate: new Date().toISOString(),
+            fileExtension: path.extname(fileName)
+        };
 
         // Aguardar um pouco mais para garantir que todas as operações terminaram
         console.log(' ○'.blue + ' Aguardando operações finalizarem...'.white);
@@ -360,7 +298,7 @@ async function openPage(browser, userData) {
 
         return downloadResult;
     } catch (error) {
-        throw new Error('Erro ao abrir link: ' + error.message);
+        throw new Error(error.message);
     } finally {
         // Verificar se a página ainda existe antes de tentar fechar
         if (page && !page.isClosed()) {

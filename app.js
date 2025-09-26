@@ -7,6 +7,7 @@ import path from "path";
 import os from "os";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import uploadVideo from "./functions/uploadVideo.js";
 dotenv.config();
 
 class App {
@@ -49,6 +50,7 @@ class App {
 
         this.executablePath = executablePath;
         this.createUser = createUser;
+        this.uploadVideo = uploadVideo;
         this.openPage = openPage;
     }
 
@@ -64,7 +66,7 @@ class App {
 
         let cycleCount = 0;
         const maxCycles = process.env.MAX_CYCLES ? parseInt(process.env.MAX_CYCLES) : 0; // 0 = infinito
-        
+
         console.log(' ○'.green + ' Iniciando ciclo contínuo de geração de vídeos...'.white);
         if (maxCycles > 0) {
             console.log(' ○'.blue + ` Configurado para executar ${maxCycles} ciclos`.white);
@@ -87,10 +89,10 @@ class App {
                 // Gerar vídeo
                 console.log(' ○'.green + ' Abrindo página...'.white);
                 const result = await this.openPage(browser, userData);
-                
+
                 if (result.success) {
                     console.log(' ○'.green + ' Vídeo gerado com sucesso!'.white);
-                    console.log(' ○'.green + ' Resultado: '.white + `\n${JSON.stringify(result, null, 2)}`.blue);
+                    await this.uploadVideo(browser, result.fileName);
                 } else {
                     console.log(' ○'.red + ' Falha na geração do vídeo'.white);
                 }
@@ -102,16 +104,16 @@ class App {
                 }
 
                 // Aguardar antes do próximo ciclo
-                const waitTime = process.env.CYCLE_DELAY ? parseInt(process.env.CYCLE_DELAY) : 10000; // 10 segundos padrão
-                console.log(' ○'.blue + ` Aguardando ${waitTime/1000} segundos antes do próximo ciclo...`.white);
+                const waitTime = process.env.CYCLE_DELAY ? parseInt(process.env.CYCLE_DELAY) : 10000;
+                console.log(' ○'.blue + ` Aguardando ${waitTime / 1000} segundos antes do próximo ciclo...`.white);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
 
             } catch (error) {
                 console.log(' ○'.red + ` Erro no ciclo ${cycleCount}: ${error.message}`.white);
-                
+
                 // Aguardar antes de tentar novamente
                 const retryDelay = process.env.RETRY_DELAY ? parseInt(process.env.RETRY_DELAY) : 30000; // 30 segundos padrão
-                console.log(' ○'.yellow + ` Aguardando ${retryDelay/1000} segundos antes de tentar novamente...`.white);
+                console.log(' ○'.yellow + ` Aguardando ${retryDelay / 1000} segundos antes de tentar novamente...`.white);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             }
         }
@@ -119,7 +121,7 @@ class App {
         console.log('\n' + '='.repeat(60).green);
         console.log(' ○'.green + ' TODOS OS CICLOS CONCLUÍDOS!'.white);
         console.log('='.repeat(60).green);
-        
+
         await browser.close();
     }
 }

@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 
 async function createUser(browser) {
+	try {
 	const { address, password } = await createEmail();
 	console.log(' ○'.green + ' Email:Senha => '.white + `${address}:${password}`);
 	const user = await signup(address, password);
@@ -41,6 +42,7 @@ async function createUser(browser) {
 
 				for (const email of inbox) {
 					if (email.subject.toLowerCase().includes('verify')) {
+						await new Promise(resolve => setTimeout(resolve, 2000));
 						// Ler conteúdo completo do email
 						const emailContent = await readMessage(token, email.id);
 
@@ -75,12 +77,18 @@ async function createUser(browser) {
 		id: localId
 	}
 
-	const dir = path.join(process.cwd(), 'accounts.txt');
+	const dir = path.join(process.cwd(), 'data', 'accounts.txt');
+	if (!fs.existsSync(dir)) {
+		fs.mkdirSync(dir, { recursive: true });
+	}
 	const read = fs.readFileSync(dir, 'utf8');
-	fs.writeFileSync('accounts.txt', read + '\n' + `${email}:${password}`);
+	fs.writeFileSync(dir, read + '\n' + `${email}:${password}`);
 
 	console.log(' ○'.green + ' Email de verificação recebido com sucesso!'.white);
-	return userData;
+		return userData;
+	} catch (error) {
+		throw new Error('Falha ao criar usuário: ' + error.message);
+	}
 }
 
 export default createUser;
