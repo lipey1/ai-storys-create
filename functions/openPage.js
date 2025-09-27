@@ -170,7 +170,7 @@ async function openPage(browser, userData) {
             console.log(' ○'.red + ` ART_STYLE (${process.env.ART_STYLE}) não encontrada!`.white);
         }
 
-        const generateScriptButton = await page.waitForSelector('.flex-none.w-40.relative.mdc-button.mdc-button--unelevated.mat-mdc-unelevated-button.mat-primary.mat-mdc-button-base', { timeout: 30000 });
+        const generateScriptButton = await page.waitForSelector('.flex-none.w-40.relative.mdc-button.mdc-button--unelevated.mat-mdc-unelevated-button.mat-primary.mat-mdc-button-base', { timeout: 1200000 });
         await generateScriptButton.click();
         console.log(' ○'.green + ' Geração de script iniciada...'.white);
         const confirmButtonGenerateScript = await page.waitForSelector('#CONFIRM_ACTION_BUTTON', { timeout: 180000 });
@@ -180,7 +180,7 @@ async function openPage(browser, userData) {
 
         const createFullVideo = await page.waitForSelector('.mat-mdc-tooltip-trigger.w-44.flex-none.relative.font-normal.mdc-button.mdc-button--unelevated.mat-mdc-unelevated-button.mat-primary.mat-mdc-button-base.ng-star-inserted', { timeout: 180000 });
         await createFullVideo.click();
-        const confirmButtonCreateFullVideo = await page.waitForSelector('#CONFIRM_ACTION_BUTTON', { timeout: 30000 });
+        const confirmButtonCreateFullVideo = await page.waitForSelector('#CONFIRM_ACTION_BUTTON', { timeout: 120000 });
         await confirmButtonCreateFullVideo.click();
         console.log(' ○'.green + ' Criação de vídeo iniciada...'.white);
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 });

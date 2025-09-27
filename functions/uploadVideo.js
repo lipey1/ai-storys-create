@@ -59,7 +59,7 @@ async function uploadVideo(browser, videoPath) {
     console.log(' ○'.green + ' Navegando para o TikTok...');
     await page.goto('https://www.tiktok.com', {
         waitUntil: 'networkidle2',
-        timeout: 30000
+        timeout: 120000
     });
 
     // Define os cookies limpos
@@ -89,7 +89,7 @@ async function uploadVideo(browser, videoPath) {
     console.log(' ○'.green + ' Recarregando página com cookies...');
     await page.goto('https://www.tiktok.com/tiktokstudio/upload?from=webapp', {
         waitUntil: 'networkidle2',
-        timeout: 30000
+        timeout: 120000
     });
 
     // Aguarda o input de upload aparecer
@@ -229,7 +229,7 @@ async function uploadVideo(browser, videoPath) {
             setTimeout(() => {
                 clearInterval(interval);
                 resolve(false);
-            }, 300000);
+            }, 1200000);
         })
 
         if (!resultButtonPublish) {
@@ -259,7 +259,7 @@ async function uploadVideo(browser, videoPath) {
             setTimeout(() => {
                 clearInterval(interval);
                 resolve(false);
-            }, 300000);
+            }, 1200000);
         })
 
         if (!resultConfirmButtonPublish) {

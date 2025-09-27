@@ -119,12 +119,26 @@ class App {
                 await new Promise(resolve => setTimeout(resolve, waitTime));
 
             } catch (error) {
-                console.log(' ○'.red + ` Erro no ciclo ${cycleCount}: ${error.message}`.white);
+                // Verificar se é erro de timeout da API de email
+                if (error.message && error.message.includes('fetch failed') && 
+                    error.cause && error.cause.code === 'UND_ERR_CONNECT_TIMEOUT' &&
+                    error.cause.message && error.cause.message.includes('api.mail.tm')) {
+                    
+                    console.log(' ○'.yellow + ' Houve um erro ao acessar a API de email (timeout)'.white);
+                    console.log(' ○'.blue + ' Pulando para o próximo ciclo...'.white);
+                    
+                    // Aguardar menos tempo para erro de API
+                    const apiErrorDelay = process.env.API_ERROR_DELAY ? parseInt(process.env.API_ERROR_DELAY) : 5000; // 5 segundos padrão
+                    console.log(' ○'.blue + ` Aguardando ${apiErrorDelay / 1000} segundos antes do próximo ciclo...`.white);
+                    await new Promise(resolve => setTimeout(resolve, apiErrorDelay));
+                } else {
+                    console.log(' ○'.red + ` Erro no ciclo ${cycleCount}: ${error.message}`.white);
 
-                // Aguardar antes de tentar novamente
-                const retryDelay = process.env.RETRY_DELAY ? parseInt(process.env.RETRY_DELAY) : 30000; // 30 segundos padrão
-                console.log(' ○'.yellow + ` Aguardando ${retryDelay / 1000} segundos antes de tentar novamente...`.white);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    // Aguardar antes de tentar novamente
+                    const retryDelay = process.env.RETRY_DELAY ? parseInt(process.env.RETRY_DELAY) : 30000; // 30 segundos padrão
+                    console.log(' ○'.yellow + ` Aguardando ${retryDelay / 1000} segundos antes de tentar novamente...`.white);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                }
             }
         }
 
@@ -137,6 +151,24 @@ class App {
 }
 
 export default App;
+
+process.on("unhandledRejection", (reason, promise) => {
+    if (reason?.code === "UND_ERR_CONNECT_TIMEOUT") {
+        console.log(' ○'.red + ` Erro ao acessar a API de email: ${error.message}`.white);
+        return;
+    }
+    console.log(' ○'.red + ` Erro: ${error.stack}`.white);
+
+});
+
+// Captura erros não tratados no geral
+process.on("uncaughtException", (error) => {
+    if (error?.code === "UND_ERR_CONNECT_TIMEOUT") {
+        console.log(' ○'.red + ` Erro ao acessar a API de email: ${error.message}`.white);
+        return;
+    }
+    console.log(' ○'.red + ` Erro: ${error.stack}`.white);
+});
 
 const app = new App();
 app.start();
