@@ -1,0 +1,20 @@
+{
+  "watermark": {
+    "image": "data/watermark.png",
+    "position": {
+      "x": "center",
+      "y": 30
+    },
+    "size": {
+      "width": 350,
+      "height": "auto"
+    },
+    "opacity": 1,
+    "scale": 1.0
+  },
+  "ffmpeg": {
+    "preset": "medium",
+    "crf": 23,
+    "codec": "libx264"
+  }
+}

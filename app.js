@@ -8,6 +8,7 @@ import os from "os";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import uploadVideo from "./functions/uploadVideo.js";
+import addWaterMark from "./functions/addWaterMark.js";
 dotenv.config();
 
 class App {
@@ -50,6 +51,7 @@ class App {
 
         this.executablePath = executablePath;
         this.createUser = createUser;
+        this.addWaterMark = addWaterMark;
         this.uploadVideo = uploadVideo;
         this.openPage = openPage;
     }
@@ -92,7 +94,15 @@ class App {
 
                 if (result.success) {
                     console.log(' ○'.green + ' Vídeo gerado com sucesso!'.white);
-                    await this.uploadVideo(browser, result.fileName);
+                    const videoPath = await this.addWaterMark(result.filePath);
+                    try {
+                        fs.unlinkSync(result.filePath);
+                        console.log(' ○'.green + ' Arquivo do vídeo original removido com sucesso!'.white);
+                    } catch { }
+                    console.log(' ○'.green + ' Vídeo com marca d\'água gerado com sucesso!'.white);
+                    console.log(' ○'.blue + ` Arquivo salvo: ${videoPath}`.white);
+                    console.log(' ○'.blue + ' Fazendo upload do vídeo...'.white);
+                    await this.uploadVideo(browser, videoPath);
                 } else {
                     console.log(' ○'.red + ' Falha na geração do vídeo'.white);
                 }

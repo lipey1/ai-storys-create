@@ -3,7 +3,7 @@ import path from 'path';
 import colors from 'colors';
 import { GoogleGenAI } from "@google/genai";
 
-async function uploadVideo(browser, videoName) {
+async function uploadVideo(browser, videoPath) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     // Cria uma nova página
     const page = await browser.newPage();
@@ -102,9 +102,6 @@ async function uploadVideo(browser, videoName) {
         });
 
         console.log(' ○'.green + ' Input de upload encontrado!');
-
-        // Caminho do vídeo local
-        const videoPath = path.join(process.cwd(), 'downloads', videoName);
 
         // Verifica se o arquivo existe
         if (!fs.existsSync(videoPath)) {
