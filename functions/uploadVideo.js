@@ -123,14 +123,16 @@ async function uploadVideo(browser, videoPath) {
         const videoBuffer = fs.readFileSync(videoPath);
         console.log(' ○'.green + ` Arquivo de vídeo lido: ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB`.white);
 
-        const responseDescription = await ai.models.generateContent({
-            model: process.env.GEMINI_MODEL,
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        {
-                            text: `
+        let responseDescription = null;
+        try {
+            responseDescription = await ai.models.generateContent({
+                model: process.env.GEMINI_MODEL,
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [
+                            {
+                                text: `
                             Cria uma descrição viral, curta e envolvente para um vídeo curto que será postado em redes sociais.
                             O texto deve ser atrativo, com linguagem que chame a atenção do público.
 
@@ -151,19 +153,34 @@ async function uploadVideo(browser, videoPath) {
                             [HASHTAGS]
 
                             ATENÇÃO!, quero apenas uma descrição e não escreva a palavra descrição ou tags!`
-                        },
-                        {
-                            inlineData: {
-                                mimeType: 'video/mp4',
-                                data: videoBuffer.toString('base64')
+                            },
+                            {
+                                inlineData: {
+                                    mimeType: 'video/mp4',
+                                    data: videoBuffer.toString('base64')
+                                }
                             }
-                        }
-                    ]
-                }
-            ],
-            responseMimeType: 'application/json',
-            responseSchema: { descricao: 'string', hashtags: 'array' },
-        });
+                        ]
+                    }
+                ],
+                responseMimeType: 'application/json',
+                responseSchema: { descricao: 'string', hashtags: 'array' },
+            });
+        } catch {
+            console.log(' ○'.red + ' Erro ao gerar descrição, gerando descrição aleatória...'.white);
+            console.log(' ○'.red + ' Erro: '.white + error.message);
+            const descriptions = fs.readFileSync(path.join(process.cwd(), 'data', 'descriptions.json'), 'utf8');
+            const descriptionsArray = JSON.parse(descriptions);
+            const randomDescription = descriptionsArray[Math.floor(Math.random() * descriptionsArray.length)];
+            responseDescription = {
+                candidates: [
+                    {
+                        content: { parts: [{ text: randomDescription }] }
+                    }
+                ]
+            }
+            console.log(' ○'.red + ' Descrição aleatória: '.white + randomDescription);
+        }
 
         // Processa a resposta JSON do Gemini
         const responseData = responseDescription.candidates[0].content.parts[0].text;
