@@ -7,7 +7,7 @@ import path from "path";
 import os from "os";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import uploadVideo from "./functions/uploadVideo.js";
+import uploadVideo from "./functions/upload/uploadVideo.js";
 import addWaterMark from "./functions/addWaterMark.js";
 dotenv.config();
 
