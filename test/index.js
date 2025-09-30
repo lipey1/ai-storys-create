@@ -6,6 +6,10 @@ import fs from "fs";
 import path from "path";
 import colors from "colors";
 import uploadInstagramStorys from "../functions/upload/uploadInstagramStories.js";
+import uploadShorts from "../functions/upload/uploadShorts.js";
+import genDescription from "../functions/upload/genDescription.js";
+import dotenv from "dotenv";
+dotenv.config({path: path.resolve('..', '.env')});
 
 async function test() {
     function getChromeExecutablePath() {
@@ -53,11 +57,13 @@ async function test() {
         protocolTimeout: 1800000
     });
 
-    const videoPath = path.resolve(process.cwd(), 'test.mp4');
+    const videoPath = path.resolve('C:\\projects\\ai\\downloads\\6Ji5onukymie_final_video_68da9cce4f8d01687d9f7a38_with_watermark.mp4');
     if (!fs.existsSync(videoPath)) {
         return console.log(' ○'.red + ' Arquivo de vídeo não encontrado: '.white + videoPath);
     }
-    await uploadInstagramStorys(browser, videoPath, 'test');
+    const description = await genDescription(videoPath);
+    console.log(description);
+    await uploadShorts(browser, videoPath, description);
 }
 
 test();
