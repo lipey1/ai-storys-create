@@ -9,6 +9,7 @@ import uploadInstagramStorys from "../functions/upload/uploadInstagramStories.js
 import uploadShorts from "../functions/upload/uploadShorts.js";
 import genDescription from "../functions/upload/genDescription.js";
 import dotenv from "dotenv";
+import uploadTikTok from "../functions/upload/uploadTikTok.js";
 dotenv.config({path: path.resolve('..', '.env')});
 
 async function test() {
@@ -62,8 +63,7 @@ async function test() {
         return console.log(' ○'.red + ' Arquivo de vídeo não encontrado: '.white + videoPath);
     }
     const description = await genDescription(videoPath);
-    console.log(description);
-    await uploadShorts(browser, videoPath, description);
+    await uploadTikTok(browser, videoPath, description);
 }
 
 test();
